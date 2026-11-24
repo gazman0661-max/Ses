@@ -68,6 +68,8 @@ jobs:
         run: |
           sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "29.0.13113456"/' app/build.gradle.kts
           grep -n 'ndkVersion' app/build.gradle.kts
+          sed -i '0,/release {/s//release {\n            isMinifyEnabled = false\n            isShrinkResources = false/' app/build.gradle.kts
+          grep -n -A4 'release {' app/build.gradle.kts
           cat >> build.gradle.kts <<'EOF'
 
           subprojects {
@@ -108,4 +110,3 @@ jobs:
           name: sesnot-aab-unsigned
           path: ${{ env.PROJE_DIR }}/build_app/build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
-          
