@@ -63,6 +63,12 @@ jobs:
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_app/android/app/build.gradle*
           sed -i '/signingConfigs.getByName("debug")/d; /signingConfig signingConfigs.debug/d' build_app/android/app/build.gradle*
 
+      - name: Android lisanslarını kabul et ve NDK 29 kur
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "ndk;29.0.13113456"
+
       - name: Bağımlılıkları indir
         working-directory: ${{ env.PROJE_DIR }}/build_app
         run: flutter pub get
@@ -86,3 +92,4 @@ jobs:
           name: sesnot-aab-unsigned
           path: ${{ env.PROJE_DIR }}/build_app/build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+          
