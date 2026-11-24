@@ -63,6 +63,20 @@ jobs:
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_app/android/app/build.gradle*
           sed -i '/signingConfigs.getByName("debug")/d; /signingConfig signingConfigs.debug/d' build_app/android/app/build.gradle*
 
+      - name: R8 kuralları ve NDK 29 ayarı
+        working-directory: ${{ env.PROJE_DIR }}/build_app/android/app
+        run: |
+          cat > proguard-rules.pro <<'EOF'
+          -dontwarn com.google.mlkit.vision.text.chinese.**
+          -dontwarn com.google.mlkit.vision.text.devanagari.**
+          -dontwarn com.google.mlkit.vision.text.japanese.**
+          -dontwarn com.google.mlkit.vision.text.korean.**
+          EOF
+          sed -i 's/^          //' proguard-rules.pro
+          sed -i '0,/release {/s//release {\n            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")/' build.gradle.kts
+          sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "29.0.13113456"/' build.gradle.kts
+          grep -n 'proguardFiles\|ndkVersion' build.gradle.kts
+
       - name: Android lisanslarını kabul et ve NDK 29 kur
         run: |
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
