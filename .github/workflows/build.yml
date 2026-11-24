@@ -91,6 +91,16 @@ jobs:
         working-directory: ${{ env.PROJE_DIR }}/build_app
         run: flutter pub get
 
+      - name: whisper_ggml model yolu (teshis)
+        working-directory: ${{ env.PROJE_DIR }}/build_app
+        run: |
+          D=$(find ~/.pub-cache -type d -name 'whisper_ggml-*' | head -n 1)
+          echo "PAKET: $D"
+          echo "=== model/yol ile ilgili satirlar ==="
+          grep -rn "ggml-\|getPath\|getApplication\|getLibrary\|\.bin\|huggingface" "$D/lib" | head -60
+          echo "=== dosya listesi ==="
+          find "$D/lib" -name '*.dart' | head -40
+
       - name: Debug APK derle
         working-directory: ${{ env.PROJE_DIR }}/build_app
         run: flutter build apk --debug
