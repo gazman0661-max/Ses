@@ -1,0 +1,88 @@
+name: Zip Ac ve Derle
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ZIP dosyasını aç
+        run: |
+          ZIP=$(ls *.zip | head -n 1)
+          echo "ZIP: $ZIP"
+          mkdir -p src
+          unzip -q -o "$ZIP" -d src
+          PUB=$(find src -name pubspec.yaml -not -path '*/build_app/*' | head -n 1)
+          if [ -z "$PUB" ]; then echo "pubspec.yaml bulunamadı"; exit 1; fi
+          echo "PROJE_DIR=$(dirname "$PUB")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter sürümünü göster
+        run: flutter --version
+
+      - name: Android iskeleti
+        run: flutter create --platforms=android --project-name sesnot --org com.sesnot.app "$PROJE_DIR/build_app"
+
+      - name: Paket adını com.sesnot.app yap
+        working-directory: ${{ env.PROJE_DIR }}/build_app
+        run: |
+          OLD=com.sesnot.app.sesnot
+          NEW=com.sesnot.app
+          sed -i "s/$OLD/$NEW/g" android/app/build.gradle*
+          KT=$(find android/app/src/main/kotlin -name MainActivity.kt | head -n 1)
+          DEST=android/app/src/main/kotlin/com/sesnot/app/MainActivity.kt
+          mkdir -p "$(dirname "$DEST")"
+          if [ "$KT" != "$DEST" ]; then mv "$KT" "$DEST"; fi
+          sed -i "s/^package .*/package $NEW/" "$DEST"
+          find android/app/src/main/kotlin -type d -empty -delete
+          grep -n 'applicationId\|namespace' android/app/build.gradle*
+          grep -q "\"$NEW\"" android/app/build.gradle* || { echo "Paket adı düzeltilemedi"; exit 1; }
+
+      - name: Kodu kopyala ve yamala
+        working-directory: ${{ env.PROJE_DIR }}
+        run: |
+          rm -rf build_app/lib build_app/test
+          cp -r lib build_app/lib
+          cp -r assets build_app/assets
+          cp pubspec.yaml build_app/pubspec.yaml
+          python3 tools/patch_manifest.py build_app/android/app/src/main/AndroidManifest.xml
+          python3 tools/patch_android_service.py build_app/android/app/src/main/AndroidManifest.xml
+          python3 tools/patch_icon.py build_app/android/app/src/main/res
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_app/android/app/build.gradle*
+          sed -i '/signingConfigs.getByName("debug")/d; /signingConfig signingConfigs.debug/d' build_app/android/app/build.gradle*
+
+      - name: Bağımlılıkları indir
+        working-directory: ${{ env.PROJE_DIR }}/build_app
+        run: flutter pub get
+
+      - name: Debug APK derle
+        working-directory: ${{ env.PROJE_DIR }}/build_app
+        run: flutter build apk --debug
+
+      - name: İmzasız AAB derle
+        working-directory: ${{ env.PROJE_DIR }}/build_app
+        run: flutter build appbundle --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sesnot-debug-apk
+          path: ${{ env.PROJE_DIR }}/build_app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sesnot-aab-unsigned
+          path: ${{ env.PROJE_DIR }}/build_app/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
