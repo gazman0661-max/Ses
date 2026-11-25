@@ -63,6 +63,22 @@ jobs:
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_app/android/app/build.gradle*
           sed -i '/signingConfigs.getByName("debug")/d; /signingConfig signingConfigs.debug/d' build_app/android/app/build.gradle*
 
+      - name: Whisper modellerini indir ve APK'ya göm
+        working-directory: ${{ env.PROJE_DIR }}/build_app
+        run: |
+          A=android/app/src/main/assets/models
+          mkdir -p "$A"
+          HF=https://huggingface.co/ggerganov/whisper.cpp/resolve/main
+          curl -L --fail --retry 5 --retry-delay 5 -o "$A/ggml-base.bin" "$HF/ggml-base.bin"
+          curl -L --fail --retry 5 --retry-delay 5 -o "$A/ggml-small.bin" "$HF/ggml-small.bin"
+          B=$(stat -c%s "$A/ggml-base.bin")
+          S=$(stat -c%s "$A/ggml-small.bin")
+          echo "base=$B small=$S"
+          [ "$B" -gt 100000000 ] || { echo "base modeli eksik indi"; exit 1; }
+          [ "$S" -gt 400000000 ] || { echo "small modeli eksik indi"; exit 1; }
+          printf 'ggml-base.bin %s\nggml-small.bin %s\n' "$B" "$S" > "$A/sizes.txt"
+          ls -la "$A"
+
       - name: NDK 29 ayarı ve lint kapatma
         working-directory: ${{ env.PROJE_DIR }}/build_app/android
         run: |
@@ -90,16 +106,6 @@ jobs:
       - name: Bağımlılıkları indir
         working-directory: ${{ env.PROJE_DIR }}/build_app
         run: flutter pub get
-
-      - name: whisper_ggml model yolu (teshis)
-        working-directory: ${{ env.PROJE_DIR }}/build_app
-        run: |
-          D=$(find ~/.pub-cache -type d -name 'whisper_ggml-*' | head -n 1)
-          echo "PAKET: $D"
-          echo "=== model/yol ile ilgili satirlar ==="
-          grep -rn "ggml-\|getPath\|getApplication\|getLibrary\|\.bin\|huggingface" "$D/lib" | head -60
-          echo "=== dosya listesi ==="
-          find "$D/lib" -name '*.dart' | head -40
 
       - name: Debug APK derle
         working-directory: ${{ env.PROJE_DIR }}/build_app
